@@ -46,7 +46,7 @@ Flux.loadparams!(model, params)
 
 # Training
 function trainModel()
-  epochs = 150
+  epochs = 1
   melhor_acu = 0.0
 
   println("Training with ", epochs, " epochs...")
@@ -132,12 +132,3 @@ heatmap(string.(res["categories"]),
   title="Matriz de Confusão (scores normalizados)")
 
 # Limita o mapa de cores, para vermos melhor onde os erros estão
-
-heatmap(string.(res["categories"]),
-  string.(res["categories"]),
-  res["normalised_scores"],
-  seriescolor=cgrad([:white, :blue]),
-  clim=(0.0, 0.02),
-  xlabel="Predito",
-  ylabel="Real",
-  title="Matriz de Confusão (scores normalizados)")
