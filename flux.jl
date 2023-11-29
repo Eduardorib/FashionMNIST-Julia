@@ -2,7 +2,7 @@ using Flux, MLDatasets, Statistics, ProgressMeter, MLUtils, Dates, Plots
 using BetaML: ConfusionMatrix, fit!, info
 using Printf, BSON
 
-include("TermShow.jl")
+include("termShow.jl")
 
 # Training data
 train_data = FashionMNIST(split=:train)
@@ -16,6 +16,8 @@ train_Y = Flux.onehotbatch(train_Y, 0:(length(categories)-1))
 test_data = FashionMNIST(split=:test)
 test_X, test_Y = test_data[:]
 test_X = MLUtils.unsqueeze(test_X, 3)
+test_ŷ = Nothing
+# test_Y = Flux.onehotbatch(test_Y, 0:(length(categories)-1))
 
 # Model
 model = Chain(
@@ -29,38 +31,43 @@ model = Chain(
   Dense(84, length(categories))
 )
 
-accuracy(ŷ, y) = (mean(Flux.onecold(ŷ) .== Flux.onecold(y)))
-
 # Loss Function
 loss(x, y) = Flux.Losses.logitcrossentropy(model(x), y)
 
 # Optmiser
 optimiser = ADAM()
 
+parameters = Flux.params(model);
+
+BSON.@load joinpath("./", "mnist_conv.bson") params
+
+# Loading params
+Flux.loadparams!(model, params)
+
 # Training
 function trainModel()
-  epochs = 40
+  epochs = 150
   melhor_acu = 0.0
 
   println("Training with ", epochs, " epochs...")
-  parameters = Flux.params(model)
   _train_data = [(train_X, train_Y)]
 
   @showprogress for epoch in 1:epochs
     Flux.train!(loss, parameters, _train_data, optimiser)
 
-    test_ŷ = model(test_X)
+    global test_ŷ = model(test_X)
     acu = accuracy()
 
+    println("\n")
+    @info(@sprintf("\n[%d]: Accuracy on test: %.4f", epoch, acu))
+
     if acu >= melhor_acu
-      @info(" -> Uma nova melhor acurácia! Salvando o modelo para mnist_conv.bson")
+      println("\n")
+      @info(" -> Better accuracy found! Salving model to mnist_conv.bson")
       BSON.@save joinpath("./", "mnist_conv.bson") params = parameters epoch acu
       melhor_acu = acu
     end
 
-    println("\n")
-    @info(@sprintf("\n[%d]: Acurácia nos testes: %.4f", epoch, acu))
-    # Se a acurácia for muito boa, termine o treino
     if acu >= 0.999
       @info(" -> Training done : accuracy of 99.9%")
       break
@@ -87,13 +94,67 @@ end
 function testModel()
   println("Testing model...")
 
-  # Run inference on the first test image which should be "Ankle Boot"
-  temp_image_ = test_X[:, :, 1, 1]
-  temp_image_r = reshape(temp_image_, size(temp_image_)..., 1, 1)
+  #= random_index = rand(1:length(test_X)) =#
+
+  test = rand(1:length(test_Y))
+
+  local temp_image_ = test_X[:, :, 1, test]
+  local temp_image_r = reshape(temp_image_, size(temp_image_)..., 1, 1)
 
   TermShow.hires_render_greyscale_image(temp_image_r)
 
+  guess_ = findmax(model(temp_image_r))[2][1]
+  correct = test_Y[test] + 1
+  println("Guessed category: ", categories[guess_], "\nCorrect category: ", categories[correct])
+  if guess_ == correct
+    println("\nCorrect guess!")
+  end
+
+  #= # Run inference on the first test image which should be "Ankle Boot"
+  temp_image_ = test_X[:, :, 1, random_index]
+  temp_image_label = test_Y[:, :, 1, random_index]
+
+  println(temp_image_label)
+
+  temp_image_r = reshape(temp_image_, size(temp_image_)..., 1, 1)
+
+
   guess = findmax(model(temp_image_r))[2]
-  println("This should be an 'Ankle boot': ", categories[guess])
+  println("This should be an 'Ankle boot': ", categories[guess]) =#
 end
 
+trainModel()
+
+y_teste = Flux.onehotbatch(test_Y, 0:(length(categories)-1))
+
+a, b = Flux.onecold(y_teste) .- 1, Flux.onecold(test_ŷ) .- 1
+println(typeof(a), " ", typeof(b))
+println(length(a), " ", length(b))
+
+cm = ConfusionMatrix()
+fit!(cm, a, b)
+# println(typeof(test_Y), " ", typeof(test_ŷ))
+# println(length(test_Y), " ", length(test_ŷ))
+# fit!(cm, test_Y .- 1, test_ŷ .- 1)
+print(cm)
+
+res = info(cm)
+
+heatmap(string.(res["categories"]),
+  string.(res["categories"]),
+  res["normalised_scores"],
+  seriescolor=cgrad([:white, :blue]),
+  xlabel="Predito",
+  ylabel="Real",
+  title="Matriz de Confusão (scores normalizados)")
+
+# Limita o mapa de cores, para vermos melhor onde os erros estão
+
+heatmap(string.(res["categories"]),
+  string.(res["categories"]),
+  res["normalised_scores"],
+  seriescolor=cgrad([:white, :blue]),
+  clim=(0.0, 0.02),
+  xlabel="Predito",
+  ylabel="Real",
+  title="Matriz de Confusão (scores normalizados)")
