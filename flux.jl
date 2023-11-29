@@ -94,8 +94,6 @@ end
 function testModel()
   println("Testing model...")
 
-  #= random_index = rand(1:length(test_X)) =#
-
   test = rand(1:length(test_Y))
 
   local temp_image_ = test_X[:, :, 1, test]
@@ -109,18 +107,6 @@ function testModel()
   if guess_ == correct
     println("\nCorrect guess!")
   end
-
-  #= # Run inference on the first test image which should be "Ankle Boot"
-  temp_image_ = test_X[:, :, 1, random_index]
-  temp_image_label = test_Y[:, :, 1, random_index]
-
-  println(temp_image_label)
-
-  temp_image_r = reshape(temp_image_, size(temp_image_)..., 1, 1)
-
-
-  guess = findmax(model(temp_image_r))[2]
-  println("This should be an 'Ankle boot': ", categories[guess]) =#
 end
 
 trainModel()
@@ -133,9 +119,6 @@ println(length(a), " ", length(b))
 
 cm = ConfusionMatrix()
 fit!(cm, a, b)
-# println(typeof(test_Y), " ", typeof(test_ŷ))
-# println(length(test_Y), " ", length(test_ŷ))
-# fit!(cm, test_Y .- 1, test_ŷ .- 1)
 print(cm)
 
 res = info(cm)
