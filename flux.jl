@@ -46,7 +46,7 @@ Flux.loadparams!(model, params)
 
 # Training
 function trainModel()
-  epochs = 1
+  epochs = 100000
   melhor_acu = 0.0
 
   println("Training with ", epochs, " epochs...")
